@@ -1,0 +1,46 @@
+:root {
+  color-scheme: light;
+  --background: #ffffff;
+  --foreground: #17212b;
+  --muted: #536170;
+  --surface: #f4f6f8;
+  --border: #d7dee5;
+  --brand-700: #a61b1b;
+  --brand-800: #871717;
+  --focus: #155eef;
+  --warning-surface: #fffaeb;
+  --warning-border: #fedf89;
+  --warning-foreground: #713b12;
+}
+
+.dark {
+  color-scheme: dark;
+  --background: #111827;
+  --foreground: #f3f4f6;
+  --muted: #a8b3c2;
+  --surface: #1f2937;
+  --border: #465365;
+  --brand-700: #e5484d;
+  --brand-800: #f16a70;
+  --focus: #84adff;
+  --warning-surface: #422006;
+  --warning-border: #854d0e;
+  --warning-foreground: #fef3c7;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-focus: var(--focus);
+  --color-warning-surface: var(--warning-surface);
+  --color-warning-border: var(--warning-border);
+  --color-warning-foreground: var(--warning-foreground);
+  --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
