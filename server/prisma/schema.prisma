@@ -1,8 +1,158 @@
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+enum Role {
+  REQUESTER
+  HELPER
+  ORGANIZATION
+  ADMIN
+}
+
+enum Category {
+  BLOOD
+  OXYGEN
+  AMBULANCE
+  HOSPITAL_BED
+  MEDICINE
+  OTHER
+}
+
+enum Urgency {
+  CRITICAL
+  HIGH
+  NORMAL
+}
+
+enum RequestStatus {
+  OPEN
+  ACCEPTED
+  FULFILLED
+  CANCELLED
+  EXPIRED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  phone         String?
+  passwordHash  String
+  role          Role           @default(REQUESTER)
+  isHelper      Boolean        @default(false)
+  trustScore    Float          @default(0)
+  language      String         @default("en")
+  isBlocked     Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  helperProfile HelperProfile?
+  organization  Organization?
+  requests      Request[]
+  notifications Notification[]
+}
+
+model HelperProfile {
+  id            String     @id @default(cuid())
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id])
+  offerings     Category[]
+  bloodGroup    String?
+  lat           Float
+  lng           Float
+  radiusKm      Float      @default(10)
+  isAvailable   Boolean    @default(true)
+  availableFrom String?
+  availableTo   String?
+  cooldownUntil DateTime?
+
+  @@index([isAvailable])
+}
+
+model Organization {
+  id         String  @id @default(cuid())
+  userId     String  @unique
+  user       User    @relation(fields: [userId], references: [id])
+  name       String
+  type       String
+  address    String
+  lat        Float
+  lng        Float
+  phone      String
+  isVerified Boolean @default(false)
+  openHours  String?
+  stock      Json?
+}
+
+model Request {
+  id           String        @id @default(cuid())
+  requesterId  String
+  requester    User          @relation(fields: [requesterId], references: [id])
+  category     Category
+  urgency      Urgency
+  title        String
+  details      Json?
+  bloodGroup   String?
+  units        Int?
+  lat          Float
+  lng          Float
+  addressText  String?
+  neededBy     DateTime
+  status       RequestStatus @default(OPEN)
+  acceptedById String?
+  duplicateOf  String?
+  createdAt    DateTime      @default(now())
+  fulfilledAt  DateTime?
+  messages     Message[]
+  reviews      Review[]
+
+  @@index([status, urgency, neededBy])
+  @@index([category])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  requestId String
+  request   Request  @relation(fields: [requestId], references: [id])
+  senderId  String
+  text      String
+  createdAt DateTime @default(now())
+
+  @@index([requestId, createdAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  type      String
+  payload   Json
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  requestId  String
+  request    Request  @relation(fields: [requestId], references: [id])
+  reviewerId String
+  revieweeId String
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  reporterId String
+  targetType String
+  targetId   String
+  reason     String
+  status     String   @default("OPEN")
+  createdAt  DateTime @default(now())
 }

@@ -3,6 +3,7 @@ node_modules/
 dist/
 coverage/
 server/generated/
+server/src/generated/
 .env
 .env.*
 !.env.example

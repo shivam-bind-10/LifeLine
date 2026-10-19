@@ -8,9 +8,11 @@
   ],
   "scripts": {
     "dev": "concurrently -k -n client,server \"npm run dev --workspace @lifeline/client\" \"npm run dev --workspace @lifeline/server\"",
+    "predev": "npm run db:generate --workspace @lifeline/server",
     "lint": "eslint .",
+    "pretest": "npm run db:generate --workspace @lifeline/server",
     "test": "vitest run",
-    "build": "npm run build --workspace @lifeline/client && npm run build --workspace @lifeline/server",
+    "build": "npm run db:generate --workspace @lifeline/server && npm run build --workspace @lifeline/client && npm run build --workspace @lifeline/server",
     "format": "prettier --write ."
   },
   "devDependencies": {
