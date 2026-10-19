@@ -8,10 +8,9 @@
 - Verified the client and API start locally; `/api/v1/health` returns `{"status":"ok"}`.
 - Updated Next.js, Tailwind, Vitest, and Prisma to patched release lines; `npm audit` reports no vulnerabilities.
 - Generated the Prisma 7 client and verified a clean `npm ci`.
-- Next: commit and push the completed Day 1 foundation, then start Day 2.
+- Completed and pushed the initial foundation as `8582ca1`; GitHub Actions passed lint, tests, and build.
 - Known issue: `vercel.md` was not included with the project or the pasted build plan.
 - Known issue: Docker Compose is not installed in this environment, so the local PostgreSQL and Redis containers cannot be started here.
-- Completed and pushed the Day 1 foundation as `8582ca1`; GitHub Actions passed lint, tests, and build.
 
 ## 2026-10-20
 
@@ -19,6 +18,10 @@
 - The initial GitHub Actions workflow completed successfully.
 - Completed and pushed the design-token checkpoint as `533e24d`; GitHub Actions passed lint, tests, and build.
 - Implemented the Day 2 Prisma schema, indexes, PostgreSQL client adapter, database error middleware, and repeatable fictional demo seed (1 admin, 20 helpers, 10 organizations, and 15 requests).
-- Validated and generated the Prisma client; lint, 3 tests, both TypeScript builds, and `npm audit` pass.
-- Next: commit and push the completed Day 2 database work, then begin authentication.
-- Known issue: Docker Compose and a local PostgreSQL service are unavailable, so database migration and seed execution need a configured database.
+- Pushed the database milestone as `f17ac7a`; the GitHub Actions run applied migrations, seeded PostgreSQL, and passed lint, tests, and build.
+- Day 2 local validation: Prisma schema validation, lint, 3 tests, both TypeScript builds, and `npm audit` passed.
+- Implemented Day 3 registration/login, protected profiles, short-lived JWT access tokens, hashed and rotating httpOnly refresh cookies, password resets, account-block checks, and role guards.
+- Day 3 local validation: lint, 20 tests, both TypeScript builds, Prisma validation, and dependency audit passed.
+- Next: commit and push the authentication milestone, then start the app shell and auth UI.
+- Known issue: Docker Compose and PostgreSQL are not installed locally; database migration and seed were validated in GitHub Actions instead.
+- Known issue: production password-reset email delivery is not configured; the API reports this explicitly until a provider is added.

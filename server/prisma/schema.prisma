@@ -38,21 +38,23 @@ enum RequestStatus {
 }
 
 model User {
-  id            String         @id @default(cuid())
+  id            String               @id @default(cuid())
   name          String
-  email         String         @unique
+  email         String               @unique
   phone         String?
   passwordHash  String
-  role          Role           @default(REQUESTER)
-  isHelper      Boolean        @default(false)
-  trustScore    Float          @default(0)
-  language      String         @default("en")
-  isBlocked     Boolean        @default(false)
-  createdAt     DateTime       @default(now())
+  role          Role                 @default(REQUESTER)
+  isHelper      Boolean              @default(false)
+  trustScore    Float                @default(0)
+  language      String               @default("en")
+  isBlocked     Boolean              @default(false)
+  createdAt     DateTime             @default(now())
   helperProfile HelperProfile?
   organization  Organization?
   requests      Request[]
   notifications Notification[]
+  refreshTokens RefreshToken[]
+  resetTokens   PasswordResetToken[]
 }
 
 model HelperProfile {
@@ -155,4 +157,28 @@ model Report {
   reason     String
   status     String   @default("OPEN")
   createdAt  DateTime @default(now())
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, expiresAt])
 }

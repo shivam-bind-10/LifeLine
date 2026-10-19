@@ -18,6 +18,12 @@ The client runs at [http://localhost:3000](http://localhost:3000). The API healt
 
 With PostgreSQL running and `server/.env` configured, run `npm run db:migrate --workspace @lifeline/server` and then `npm run db:seed --workspace @lifeline/server`. The repeatable seed creates one admin, 20 helpers, 10 unverified demo organizations, and 15 demo requests. All seeded accounts use the configured `SEED_PASSWORD`; demo contact details and organization listings are fictional and must not be used to request real emergency assistance.
 
+## Authentication API
+
+The API is prefixed with `/api/v1`. Authentication routes include `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `GET /me`, and `PATCH /me`. Registration accepts requester and helper roles; admin accounts cannot be self-registered.
+
+Passwords are hashed with bcrypt at cost 12. Access tokens expire after 15 minutes. Refresh tokens are opaque, stored as SHA-256 hashes, rotated on refresh, and sent only in an httpOnly cookie. Configure `JWT_ACCESS_SECRET` with at least 32 random characters. Protected API calls use `Authorization: Bearer <accessToken>`. In development, a password reset token is written to the API console; production reset requests return `503 PASSWORD_RESET_UNAVAILABLE` until an email-delivery provider is configured.
+
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.
