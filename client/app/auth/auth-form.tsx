@@ -4,13 +4,16 @@ import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { useAuth } from './auth-provider';
 
-type Mode = 'login' | 'register';
+type Mode = 'login' | 'register' | 'forgot';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
 export function AuthForm() {
   const { user, isLoading, sessionError, signIn, register, signOut } =
     useAuth();
   const [mode, setMode] = useState<Mode>('login');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -22,7 +25,30 @@ export function AuthForm() {
     const email = String(formData.get('email') ?? '');
     const password = String(formData.get('password') ?? '');
     try {
-      if (mode === 'login') {
+      if (mode === 'forgot') {
+        const response = await fetch(`${API_URL}/auth/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        const body: unknown = await response.json();
+        if (!response.ok) {
+          const message =
+            typeof body === 'object' &&
+            body !== null &&
+            'error' in body &&
+            typeof body.error === 'object' &&
+            body.error !== null &&
+            'message' in body.error &&
+            typeof body.error.message === 'string'
+              ? body.error.message
+              : `Password reset request failed (HTTP ${response.status}).`;
+          throw new Error(message);
+        }
+        setNotice(
+          'If an account exists for this email, password reset instructions will be sent.',
+        );
+      } else if (mode === 'login') {
         await signIn({ email, password });
       } else {
         await register({
@@ -113,29 +139,38 @@ export function AuthForm() {
                 {sessionError}
               </p>
             )}
-            <div
-              aria-label="Choose account action"
-              className="mt-7 grid grid-cols-2 rounded-lg bg-surface p-1"
-              role="group"
-            >
-              {(['login', 'register'] as const).map((option) => (
-                <button
-                  aria-pressed={mode === option}
-                  className={`rounded-md px-3 py-2 text-sm font-semibold ${
-                    mode === option ? 'bg-background shadow-sm' : 'text-muted'
-                  }`}
-                  key={option}
-                  onClick={() => {
-                    setMode(option);
-                    setError(null);
-                  }}
-                  type="button"
-                >
-                  {option === 'login' ? 'Sign in' : 'Create account'}
-                </button>
-              ))}
-            </div>
+            {mode !== 'forgot' && (
+              <div
+                aria-label="Choose account action"
+                className="mt-7 grid grid-cols-2 rounded-lg bg-surface p-1"
+                role="group"
+              >
+                {(['login', 'register'] as const).map((option) => (
+                  <button
+                    aria-pressed={mode === option}
+                    className={`rounded-md px-3 py-2 text-sm font-semibold ${
+                      mode === option ? 'bg-background shadow-sm' : 'text-muted'
+                    }`}
+                    key={option}
+                    onClick={() => {
+                      setMode(option);
+                      setError(null);
+                      setNotice(null);
+                    }}
+                    type="button"
+                  >
+                    {option === 'login' ? 'Sign in' : 'Create account'}
+                  </button>
+                ))}
+              </div>
+            )}
 
+            {mode === 'forgot' && (
+              <p className="mt-5 text-sm text-muted">
+                Enter your account email and we&apos;ll send a one-time reset
+                link if an account matches.
+              </p>
+            )}
             <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
               {mode === 'register' && (
                 <>
@@ -190,31 +225,33 @@ export function AuthForm() {
                   type="email"
                 />
               </div>
-              <div>
-                <label
-                  className="mb-1.5 block text-sm font-medium"
-                  htmlFor="password"
-                >
-                  Password
-                </label>
-                <input
-                  autoComplete={
-                    mode === 'login' ? 'current-password' : 'new-password'
-                  }
-                  className="w-full rounded-md border border-border bg-background px-3 py-2.5"
-                  id="password"
-                  maxLength={128}
-                  minLength={mode === 'register' ? 12 : 1}
-                  name="password"
-                  required
-                  type="password"
-                />
-                {mode === 'register' && (
-                  <p className="mt-1.5 text-xs text-muted">
-                    Use at least 12 characters.
-                  </p>
-                )}
-              </div>
+              {mode !== 'forgot' && (
+                <div>
+                  <label
+                    className="mb-1.5 block text-sm font-medium"
+                    htmlFor="password"
+                  >
+                    Password
+                  </label>
+                  <input
+                    autoComplete={
+                      mode === 'login' ? 'current-password' : 'new-password'
+                    }
+                    className="w-full rounded-md border border-border bg-background px-3 py-2.5"
+                    id="password"
+                    maxLength={128}
+                    minLength={mode === 'register' ? 12 : 1}
+                    name="password"
+                    required
+                    type="password"
+                  />
+                  {mode === 'register' && (
+                    <p className="mt-1.5 text-xs text-muted">
+                      Use at least 12 characters.
+                    </p>
+                  )}
+                </div>
+              )}
               <button
                 className="w-full rounded-md bg-brand-700 px-5 py-3 font-semibold text-white hover:bg-brand-800 disabled:cursor-not-allowed disabled:opacity-60"
                 disabled={isSubmitting}
@@ -224,12 +261,48 @@ export function AuthForm() {
                   ? 'Please wait...'
                   : mode === 'login'
                     ? 'Sign in'
-                    : 'Create account'}
+                    : mode === 'register'
+                      ? 'Create account'
+                      : 'Send reset link'}
               </button>
             </form>
+            {mode === 'login' && (
+              <button
+                className="mt-4 text-sm font-semibold text-brand-700 hover:text-brand-800"
+                onClick={() => {
+                  setMode('forgot');
+                  setError(null);
+                  setNotice(null);
+                }}
+                type="button"
+              >
+                Forgot password?
+              </button>
+            )}
+            {mode === 'forgot' && (
+              <button
+                className="mt-4 text-sm font-semibold text-brand-700 hover:text-brand-800"
+                onClick={() => {
+                  setMode('login');
+                  setError(null);
+                  setNotice(null);
+                }}
+                type="button"
+              >
+                Back to sign in
+              </button>
+            )}
           </>
         )}
 
+        {notice && (
+          <p
+            className="mt-5 rounded-md border border-border bg-surface p-3 text-sm"
+            role="status"
+          >
+            {notice}
+          </p>
+        )}
         {error && (
           <p
             className="mt-5 rounded-md border border-warning-border bg-warning-surface p-3 text-sm text-warning-foreground"

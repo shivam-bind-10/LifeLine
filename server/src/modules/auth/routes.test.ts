@@ -1,6 +1,6 @@
 import { hash, compare } from 'bcryptjs';
 import request from 'supertest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Role } from '../../generated/prisma/client.js';
 import { createApp } from '../../app.js';
 import { prisma } from '../../lib/prisma.js';
@@ -82,11 +82,18 @@ function makePublicUser(user = makeUser()) {
 }
 
 describe('authentication routes', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.JWT_ACCESS_SECRET =
       'test-only-access-secret-with-at-least-32-bytes';
     process.env.NODE_ENV = 'test';
+    delete process.env.RESEND_API_KEY;
+    delete process.env.PASSWORD_RESET_FROM;
+    process.env.CLIENT_URL = 'http://localhost:3000';
     database.transaction.mockImplementation(async (operation) => {
       if (typeof operation === 'function') {
         return operation(prisma);
@@ -259,6 +266,71 @@ describe('authentication routes', () => {
     expect(response.status).toBe(503);
     expect(response.body.error.code).toBe('PASSWORD_RESET_UNAVAILABLE');
     expect(database.userFindUnique).not.toHaveBeenCalled();
+  });
+
+  it('sends password reset instructions when the production email provider is configured', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.RESEND_API_KEY = 'test-resend-key';
+    process.env.PASSWORD_RESET_FROM = 'LifeLine <no-reply@example.com>';
+    process.env.CLIENT_URL = 'https://lifeline.example.com';
+    database.userFindUnique.mockResolvedValue({ id: 'user-1' });
+    database.resetUpdateMany.mockResolvedValue({ count: 0 });
+    database.resetCreate.mockResolvedValue({});
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await request(createApp())
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: 'ASHA@example.com' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.message).toContain('If an account exists');
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://api.resend.com/emails',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({
+          Authorization: 'Bearer test-resend-key',
+        }),
+      }),
+    );
+    const email = JSON.parse(fetchMock.mock.calls[0]?.[1].body as string);
+    expect(email.to).toEqual(['asha@example.com']);
+    expect(email.text).toContain(
+      'https://lifeline.example.com/auth/reset?token=',
+    );
+    expect(database.resetCreate).toHaveBeenCalledOnce();
+  });
+
+  it('invalidates the reset token and surfaces a delivery failure', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.RESEND_API_KEY = 'test-resend-key';
+    process.env.PASSWORD_RESET_FROM = 'LifeLine <no-reply@example.com>';
+    process.env.CLIENT_URL = 'https://lifeline.example.com';
+    database.userFindUnique.mockResolvedValue({ id: 'user-1' });
+    database.resetUpdateMany.mockResolvedValue({ count: 0 });
+    database.resetCreate.mockResolvedValue({});
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 429 }),
+    );
+
+    const response = await request(createApp())
+      .post('/api/v1/auth/forgot-password')
+      .send({ email: 'asha@example.com' });
+
+    expect(response.status).toBe(500);
+    expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+    expect(database.resetUpdateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: 'user-1',
+          usedAt: null,
+          tokenHash: expect.any(String),
+        }),
+      }),
+    );
   });
 
   it('logs out and clears a refresh cookie', async () => {

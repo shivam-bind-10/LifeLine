@@ -22,9 +22,11 @@ With PostgreSQL running and `server/.env` configured, run `npm run db:migrate --
 
 The API is prefixed with `/api/v1`. Authentication routes include `POST /auth/register`, `POST /auth/login`, `POST /auth/refresh`, `POST /auth/logout`, `POST /auth/forgot-password`, `POST /auth/reset-password`, `GET /me`, and `PATCH /me`. Registration accepts requester and helper roles; admin accounts cannot be self-registered.
 
-Passwords are hashed with bcrypt at cost 12. Access tokens expire after 15 minutes. Refresh tokens are opaque, stored as SHA-256 hashes, rotated on refresh, and sent only in an httpOnly cookie. Configure `JWT_ACCESS_SECRET` with at least 32 random characters. Protected API calls use `Authorization: Bearer <accessToken>`. In development, a password reset token is written to the API console; production reset requests return `503 PASSWORD_RESET_UNAVAILABLE` until an email-delivery provider is configured.
+Passwords are hashed with bcrypt at cost 12. Access tokens expire after 15 minutes. Refresh tokens are opaque, stored as SHA-256 hashes, rotated on refresh, and sent only in an httpOnly cookie. Configure `JWT_ACCESS_SECRET` with at least 32 random characters. Protected API calls use `Authorization: Bearer <access-token>`. Password reset tokens are random, one-time, stored as SHA-256 hashes, and expire after 30 minutes. Configure Resend credentials and a verified sender for production reset email; development logs reset tokens to the API console.
 
-The client provides sign-in and requester/helper registration at `/auth`. It keeps access tokens in memory and restores sessions with the httpOnly refresh cookie.
+The client provides sign-in and requester/helper registration at `/auth`, password reset requests from the sign-in form, and reset completion at `/auth/reset`. It keeps access tokens in memory and restores sessions with the httpOnly refresh cookie.
+
+For production reset delivery, configure `RESEND_API_KEY`, a verified `PASSWORD_RESET_FROM` sender, and the public client origin in `CLIENT_URL`. The API sends one-time reset links through Resend; if delivery fails, the issued token is invalidated and an explicit API error is returned. In development, reset tokens are logged instead of sent.
 
 ## Emergency requests
 
@@ -53,3 +55,7 @@ After a request is fulfilled, its requester and accepted helper can read the req
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.
+
+## Production configuration
+
+Set `NODE_ENV=production`, a unique `JWT_ACCESS_SECRET` of at least 32 characters, `DATABASE_URL`, `CLIENT_URL`, `RESEND_API_KEY`, and `PASSWORD_RESET_FROM` in the API environment. Set `NEXT_PUBLIC_API_URL` to the deployed API's `/api/v1` URL in the client build environment. Apply migrations with `npm run db:deploy --workspace @lifeline/server` before starting the API; do not seed production. CI applies the full migration chain against PostgreSQL 16 before testing and building.

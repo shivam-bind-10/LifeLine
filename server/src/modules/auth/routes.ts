@@ -6,6 +6,10 @@ import { Role } from '../../generated/prisma/client.js';
 import { authenticate } from '../../middleware/authenticate.js';
 import { prisma } from '../../lib/prisma.js';
 import {
+  isPasswordResetEmailConfigured,
+  sendPasswordResetEmail,
+} from './password-reset-email.js';
+import {
   createAccessToken,
   createOpaqueToken,
   hashToken,
@@ -297,7 +301,8 @@ const logout: RequestHandler = async (request, response) => {
 const forgotPassword: ValidatedRequestHandler<
   z.infer<typeof forgotPasswordSchema>
 > = async (_request, response) => {
-  if (process.env.NODE_ENV === 'production') {
+  const emailConfigured = isPasswordResetEmailConfigured();
+  if (process.env.NODE_ENV === 'production' && !emailConfigured) {
     response.status(503).json({
       error: {
         code: 'PASSWORD_RESET_UNAVAILABLE',
@@ -330,7 +335,22 @@ const forgotPassword: ValidatedRequestHandler<
         },
       }),
     ]);
-    console.info('LifeLine development password reset token', { email, token });
+    if (emailConfigured) {
+      try {
+        await sendPasswordResetEmail(email, token);
+      } catch (error) {
+        await prisma.passwordResetToken.updateMany({
+          where: { userId: user.id, tokenHash: hashToken(token), usedAt: null },
+          data: { usedAt: new Date() },
+        });
+        throw error;
+      }
+    } else {
+      console.info('LifeLine development password reset token', {
+        email,
+        token,
+      });
+    }
   }
 
   response.status(200).json({

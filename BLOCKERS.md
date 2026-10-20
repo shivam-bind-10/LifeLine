@@ -1,6 +1,6 @@
 # Blockers
 
-- `vercel.md`, required for the UI design tokens and future interface work, was not present in the workspace or the supplied build-plan attachment.
-- Docker Compose is not installed in this environment, so the PostgreSQL and Redis containers cannot be started here.
-- PostgreSQL is not available on localhost:5432 in this environment, so database migrations and seeding run in CI rather than on this machine.
-- Password-reset email delivery is not configured; production reset requests return `503 PASSWORD_RESET_UNAVAILABLE` until a delivery provider is added.
+- The referenced `vercel.md` design guide was not supplied, so the interface uses the documented LifeLine design tokens rather than an unavailable external specification.
+- Docker Compose and PostgreSQL are unavailable in this environment. CI applies the migrations against PostgreSQL 16, but a deployment database still needs provisioning and migration.
+- Password-reset delivery is implemented through Resend. Production setup still requires a verified sender, `RESEND_API_KEY`, and public `CLIENT_URL`.
+- No production hosting target, domain, database credentials, Resend credentials, or deployment secrets were supplied, so deployment and live-service verification cannot be performed from this workspace.
