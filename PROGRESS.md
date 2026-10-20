@@ -22,6 +22,8 @@
 - Day 2 local validation: Prisma schema validation, lint, 3 tests, both TypeScript builds, and `npm audit` passed.
 - Implemented Day 3 registration/login, protected profiles, short-lived JWT access tokens, hashed and rotating httpOnly refresh cookies, password resets, account-block checks, and role guards.
 - Day 3 local validation: lint, 20 tests, both TypeScript builds, Prisma validation, and dependency audit passed.
-- Next: commit and push the authentication milestone, then start the app shell and auth UI.
+- Completed the app shell and sign-in/requester/helper registration UI. The client restores sessions through the refresh-cookie endpoint and keeps access tokens in memory rather than browser storage.
+- Day 4 local validation: lint, all 20 API tests, and production client/server builds passed. The client UI was also checked in a local production preview.
+- Next: implement emergency request creation and browsing against the existing Prisma schema.
 - Known issue: Docker Compose and PostgreSQL are not installed locally; database migration and seed were validated in GitHub Actions instead.
 - Known issue: production password-reset email delivery is not configured; the API reports this explicitly until a provider is added.

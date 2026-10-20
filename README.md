@@ -24,6 +24,8 @@ The API is prefixed with `/api/v1`. Authentication routes include `POST /auth/re
 
 Passwords are hashed with bcrypt at cost 12. Access tokens expire after 15 minutes. Refresh tokens are opaque, stored as SHA-256 hashes, rotated on refresh, and sent only in an httpOnly cookie. Configure `JWT_ACCESS_SECRET` with at least 32 random characters. Protected API calls use `Authorization: Bearer <accessToken>`. In development, a password reset token is written to the API console; production reset requests return `503 PASSWORD_RESET_UNAVAILABLE` until an email-delivery provider is configured.
 
+The client provides sign-in and requester/helper registration at `/auth`. It keeps access tokens in memory and restores sessions with the httpOnly refresh cookie.
+
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.
