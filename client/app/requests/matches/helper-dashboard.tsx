@@ -610,8 +610,14 @@ export function HelperDashboard() {
                       timeStyle: 'short',
                     }).format(new Date(item.neededBy))}
                   </p>
+                  <Link
+                    className="mt-4 inline-block rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-background"
+                    href={`/requests/${encodeURIComponent(item.id)}/messages`}
+                  >
+                    Message requester
+                  </Link>
                   <button
-                    className="mt-4 rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-background disabled:opacity-60"
+                    className="ml-3 mt-4 rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-background disabled:opacity-60"
                     disabled={acceptingId !== null}
                     onClick={() => void fulfillRequest(item)}
                     type="button"

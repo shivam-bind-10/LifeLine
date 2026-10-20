@@ -55,9 +55,22 @@ function notificationText(item: InboxItem) {
       return `Your request was marked fulfilled${requestLabel}.`;
     case 'REQUEST_CANCELLED':
       return `The requester cancelled the request${requestLabel}.`;
+    case 'REQUEST_MESSAGE':
+      return `You received a message about a request${requestLabel}.`;
     default:
       return `LifeLine update${requestLabel}.`;
   }
+}
+
+function notificationHref(item: InboxItem) {
+  if (
+    item.type === 'REQUEST_MESSAGE' &&
+    isRecord(item.payload) &&
+    typeof item.payload.requestId === 'string'
+  ) {
+    return `/requests/${encodeURIComponent(item.payload.requestId)}/messages`;
+  }
+  return null;
 }
 
 export function NotificationInbox() {
@@ -238,36 +251,47 @@ export function NotificationInbox() {
         </p>
       ) : (
         <ul className="mt-8 space-y-3">
-          {items.map((item) => (
-            <li
-              className={`flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border p-5 ${
-                item.readAt ? 'bg-background' : 'bg-surface'
-              }`}
-              key={item.id}
-            >
-              <div>
-                <p className="font-medium">{notificationText(item)}</p>
-                <p className="mt-2 text-sm text-muted">
-                  {new Intl.DateTimeFormat(undefined, {
-                    dateStyle: 'medium',
-                    timeStyle: 'short',
-                  }).format(new Date(item.createdAt))}
-                </p>
-              </div>
-              {item.readAt ? (
-                <span className="text-xs text-muted">Read</span>
-              ) : (
-                <button
-                  className="text-sm font-semibold text-brand-700 hover:text-brand-800 disabled:opacity-60"
-                  disabled={isUpdating}
-                  onClick={() => void markRead(item)}
-                  type="button"
-                >
-                  Mark read
-                </button>
-              )}
-            </li>
-          ))}
+          {items.map((item) => {
+            const href = notificationHref(item);
+            return (
+              <li
+                className={`flex flex-wrap items-start justify-between gap-4 rounded-xl border border-border p-5 ${
+                  item.readAt ? 'bg-background' : 'bg-surface'
+                }`}
+                key={item.id}
+              >
+                <div>
+                  <p className="font-medium">{notificationText(item)}</p>
+                  {href && (
+                    <Link
+                      className="mt-2 inline-block text-sm font-semibold text-brand-700 hover:text-brand-800"
+                      href={href}
+                    >
+                      Open conversation
+                    </Link>
+                  )}
+                  <p className="mt-2 text-sm text-muted">
+                    {new Intl.DateTimeFormat(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    }).format(new Date(item.createdAt))}
+                  </p>
+                </div>
+                {item.readAt ? (
+                  <span className="text-xs text-muted">Read</span>
+                ) : (
+                  <button
+                    className="text-sm font-semibold text-brand-700 hover:text-brand-800 disabled:opacity-60"
+                    disabled={isUpdating}
+                    onClick={() => void markRead(item)}
+                    type="button"
+                  >
+                    Mark read
+                  </button>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

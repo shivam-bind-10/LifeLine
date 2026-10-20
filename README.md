@@ -42,6 +42,10 @@ The requester can cancel their own open or accepted request with `POST /api/v1/r
 
 Signed-in users can list their own paginated notifications at `GET /api/v1/notifications`, mark one unread notification using `POST /api/v1/notifications/:id/read`, and mark all unread notifications using `POST /api/v1/notifications/read-all`. The client inbox is at `/notifications`.
 
+## Request conversations
+
+The requester and accepted helper can list the latest 100 messages using `GET /api/v1/requests/:id/messages` and send a message using `POST /api/v1/requests/:id/messages` with a trimmed `text` value of 1-2000 characters. New messages notify the other participant. Conversation history remains available after fulfillment, but new messages are accepted only while the request is active. The client conversation is linked from both the requester's history and the helper dashboard.
+
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.

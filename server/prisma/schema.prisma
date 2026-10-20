@@ -52,6 +52,7 @@ model User {
   helperProfile HelperProfile?
   organization  Organization?
   requests      Request[]
+  messages      Message[]
   notifications Notification[]
   refreshTokens RefreshToken[]
   resetTokens   PasswordResetToken[]
@@ -120,10 +121,12 @@ model Message {
   requestId String
   request   Request  @relation(fields: [requestId], references: [id])
   senderId  String
+  sender    User     @relation(fields: [senderId], references: [id])
   text      String
   createdAt DateTime @default(now())
 
   @@index([requestId, createdAt])
+  @@index([senderId])
 }
 
 model Notification {

@@ -222,9 +222,17 @@ export function MyRequests() {
                   Responder address: {item.addressText}
                 </p>
               )}
+              {(item.status === 'ACCEPTED' || item.status === 'FULFILLED') && (
+                <Link
+                  className="mt-4 inline-block rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-surface"
+                  href={`/requests/${encodeURIComponent(item.id)}/messages`}
+                >
+                  Messages
+                </Link>
+              )}
               {(item.status === 'OPEN' || item.status === 'ACCEPTED') && (
                 <button
-                  className="mt-4 rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-60"
+                  className="ml-3 mt-4 rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-60"
                   disabled={updatingId !== null}
                   onClick={() => void cancelRequest(item)}
                   type="button"
