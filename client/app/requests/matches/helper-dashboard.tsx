@@ -41,8 +41,10 @@ type MatchedRequest = {
 type AcceptedRequest = {
   id: string;
   title: string;
+  category: string;
+  urgency: string;
+  neededBy: string;
   addressText: string | null;
-  details: unknown;
   requester: { name: string; phone: string | null };
 };
 
@@ -87,6 +89,9 @@ function isAcceptedRequest(value: unknown): value is AcceptedRequest {
     isRecord(value) &&
     typeof value.id === 'string' &&
     typeof value.title === 'string' &&
+    typeof value.category === 'string' &&
+    typeof value.urgency === 'string' &&
+    typeof value.neededBy === 'string' &&
     (typeof value.addressText === 'string' || value.addressText === null) &&
     isRecord(value.requester) &&
     typeof value.requester.name === 'string' &&
@@ -115,7 +120,7 @@ export function HelperDashboard() {
   const [profile, setProfile] = useState<HelperProfile | null>(null);
   const [offerings, setOfferings] = useState<string[]>([]);
   const [matches, setMatches] = useState<MatchedRequest[]>([]);
-  const [accepted, setAccepted] = useState<AcceptedRequest | null>(null);
+  const [assisting, setAssisting] = useState<AcceptedRequest[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -154,6 +159,24 @@ export function HelperDashboard() {
         setIsAvailable(false);
         return;
       }
+
+      const assistingResponse = await apiFetch(`${API_URL}/requests/assisting`);
+      const assistingBody: unknown = await assistingResponse.json();
+      if (!assistingResponse.ok) {
+        throw new Error(
+          getErrorMessage(assistingBody, assistingResponse.status),
+        );
+      }
+      if (
+        !isRecord(assistingBody) ||
+        !Array.isArray(assistingBody.requests) ||
+        !assistingBody.requests.every(isAcceptedRequest)
+      ) {
+        throw new Error(
+          'The server returned an invalid accepted request list.',
+        );
+      }
+      setAssisting(assistingBody.requests);
 
       const matchesResponse = await apiFetch(`${API_URL}/requests/matches`);
       const matchesBody: unknown = await matchesResponse.json();
@@ -246,19 +269,6 @@ export function HelperDashboard() {
         throw new Error(getErrorMessage(acceptBody, acceptResponse.status));
       }
 
-      const detailsResponse = await apiFetch(
-        `${API_URL}/requests/${encodeURIComponent(match.id)}`,
-      );
-      const detailsBody: unknown = await detailsResponse.json();
-      if (!detailsResponse.ok) {
-        throw new Error(getErrorMessage(detailsBody, detailsResponse.status));
-      }
-      if (!isRecord(detailsBody) || !isAcceptedRequest(detailsBody.request)) {
-        throw new Error(
-          'The server returned invalid accepted request details.',
-        );
-      }
-      setAccepted(detailsBody.request);
       setNotice('Request accepted. The requester details are shown below.');
       await loadProfileAndMatches();
     } catch (acceptError) {
@@ -266,6 +276,32 @@ export function HelperDashboard() {
         acceptError instanceof Error
           ? acceptError.message
           : 'Unable to accept this request.',
+      );
+    } finally {
+      setAcceptingId(null);
+    }
+  }
+
+  async function fulfillRequest(item: AcceptedRequest) {
+    setError(null);
+    setNotice(null);
+    setAcceptingId(item.id);
+    try {
+      const response = await apiFetch(
+        `${API_URL}/requests/${encodeURIComponent(item.id)}/fulfill`,
+        { method: 'POST' },
+      );
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        throw new Error(getErrorMessage(body, response.status));
+      }
+      setNotice(`Marked "${item.title}" fulfilled.`);
+      await loadProfileAndMatches();
+    } catch (fulfillError) {
+      setError(
+        fulfillError instanceof Error
+          ? fulfillError.message
+          : 'Unable to mark the request fulfilled.',
       );
     } finally {
       setAcceptingId(null);
@@ -548,22 +584,44 @@ export function HelperDashboard() {
           </ul>
         )}
 
-        {accepted && (
-          <aside className="mt-6 rounded-xl border border-brand-700 bg-surface p-5">
-            <h3 className="font-semibold">Accepted: {accepted.title}</h3>
-            <p className="mt-3 text-sm">
-              Requester: {accepted.requester.name}
-              {accepted.requester.phone && ` · ${accepted.requester.phone}`}
-            </p>
-            {accepted.addressText && (
-              <p className="mt-2 text-sm">Address: {accepted.addressText}</p>
-            )}
-            {accepted.details !== null && accepted.details !== undefined && (
-              <p className="mt-2 text-sm text-muted">
-                Details: {JSON.stringify(accepted.details) ?? ''}
-              </p>
-            )}
-          </aside>
+        {assisting.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold">
+              Requests you&apos;re helping with
+            </h3>
+            <ul className="mt-4 space-y-3">
+              {assisting.map((item) => (
+                <li
+                  className="rounded-xl border border-brand-700 bg-surface p-5"
+                  key={item.id}
+                >
+                  <h4 className="font-semibold">{item.title}</h4>
+                  <p className="mt-2 text-sm">
+                    Requester: {item.requester.name}
+                    {item.requester.phone && ` · ${item.requester.phone}`}
+                  </p>
+                  {item.addressText && (
+                    <p className="mt-1 text-sm">Address: {item.addressText}</p>
+                  )}
+                  <p className="mt-2 text-xs text-muted">
+                    Needed by{' '}
+                    {new Intl.DateTimeFormat(undefined, {
+                      dateStyle: 'medium',
+                      timeStyle: 'short',
+                    }).format(new Date(item.neededBy))}
+                  </p>
+                  <button
+                    className="mt-4 rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-background disabled:opacity-60"
+                    disabled={acceptingId !== null}
+                    onClick={() => void fulfillRequest(item)}
+                    type="button"
+                  >
+                    {acceptingId === item.id ? 'Updating...' : 'Mark fulfilled'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
     </div>

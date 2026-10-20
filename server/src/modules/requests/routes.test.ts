@@ -13,6 +13,7 @@ const database = vi.hoisted(() => ({
   requestFindMany: vi.fn(),
   requestCreate: vi.fn(),
   requestFindUnique: vi.fn(),
+  requestFindFirst: vi.fn(),
   requestUpdateMany: vi.fn(),
   helperProfileFindUnique: vi.fn(),
   helperProfileUpsert: vi.fn(),
@@ -33,6 +34,7 @@ vi.mock('../../lib/prisma.js', () => ({
       findMany: database.requestFindMany,
       create: database.requestCreate,
       findUnique: database.requestFindUnique,
+      findFirst: database.requestFindFirst,
       updateMany: database.requestUpdateMany,
     },
     notification: { create: database.notificationCreate },
@@ -316,6 +318,30 @@ describe('request routes', () => {
     expect(database.helperProfileUpsert).not.toHaveBeenCalled();
   });
 
+  it('does not allow helper availability while an accepted request is active', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'user-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.requestFindFirst.mockResolvedValue({ id: 'active-request' });
+
+    const response = await request(createApp())
+      .put('/api/v1/requests/helper-profile')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`)
+      .send({
+        offerings: ['OXYGEN'],
+        lat: 12.97,
+        lng: 77.59,
+        radiusKm: 10,
+        isAvailable: true,
+      });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('ACTIVE_REQUEST');
+    expect(database.helperProfileUpsert).not.toHaveBeenCalled();
+  });
+
   it('returns open requests within a volunteer profile radius', async () => {
     database.userFindUnique.mockResolvedValue({
       id: 'user-1',
@@ -557,5 +583,136 @@ describe('request routes', () => {
 
     expect(response.status).toBe(404);
     expect(response.body.error.code).toBe('REQUEST_NOT_FOUND');
+  });
+
+  it('allows a requester to cancel their own open request', async () => {
+    database.requestFindUnique.mockResolvedValue({
+      requesterId: 'user-1',
+      acceptedById: null,
+      status: 'OPEN',
+    });
+    database.requestUpdateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-8/cancel')
+      .set('Authorization', `Bearer ${accessToken()}`);
+
+    expect(response.status).toBe(200);
+    expect(database.requestUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'request-8',
+        requesterId: 'user-1',
+        status: 'OPEN',
+      },
+      data: { status: 'CANCELLED' },
+    });
+    expect(database.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not allow a requester to cancel another user request', async () => {
+    database.requestFindUnique.mockResolvedValue({
+      requesterId: 'another-user',
+      acceptedById: null,
+      status: 'OPEN',
+    });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-9/cancel')
+      .set('Authorization', `Bearer ${accessToken()}`);
+
+    expect(response.status).toBe(404);
+    expect(database.requestUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('releases a volunteer and notifies them when the requester cancels an accepted request', async () => {
+    database.requestFindUnique.mockResolvedValue({
+      requesterId: 'user-1',
+      acceptedById: 'helper-1',
+      status: 'ACCEPTED',
+    });
+    database.requestUpdateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-11/cancel')
+      .set('Authorization', `Bearer ${accessToken()}`);
+
+    expect(response.status).toBe(200);
+    expect(database.helperProfileUpdateMany).toHaveBeenCalledWith({
+      where: { userId: 'helper-1' },
+      data: { isAvailable: true },
+    });
+    expect(database.notificationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 'helper-1',
+          type: 'REQUEST_CANCELLED',
+        }),
+      }),
+    );
+  });
+
+  it('allows only the accepted helper to complete a request and notifies the owner', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'helper-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.requestFindUnique.mockResolvedValue({
+      requesterId: 'requester-1',
+      acceptedById: 'helper-1',
+      status: 'ACCEPTED',
+    });
+    database.requestUpdateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-10/fulfill')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`);
+
+    expect(response.status).toBe(200);
+    expect(database.requestUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: 'request-10',
+          acceptedById: 'helper-1',
+          status: 'ACCEPTED',
+        },
+        data: {
+          status: 'FULFILLED',
+          fulfilledAt: expect.any(Date),
+        },
+      }),
+    );
+    expect(database.helperProfileUpdateMany).toHaveBeenCalledWith({
+      where: { userId: 'helper-1' },
+      data: { isAvailable: true },
+    });
+    expect(database.notificationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 'requester-1',
+          type: 'REQUEST_FULFILLED',
+        }),
+      }),
+    );
+  });
+
+  it('rejects completion by a helper who did not accept the request', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'helper-2',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.requestFindUnique.mockResolvedValue({
+      requesterId: 'requester-1',
+      acceptedById: 'helper-1',
+      status: 'ACCEPTED',
+    });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-10/fulfill')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`);
+
+    expect(response.status).toBe(404);
+    expect(database.requestUpdateMany).not.toHaveBeenCalled();
   });
 });

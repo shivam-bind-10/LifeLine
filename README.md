@@ -38,6 +38,10 @@ Helpers can save their offerings, optional blood group, location, travel radius,
 
 `POST /api/v1/requests/:id/accept` atomically reserves an available helper and claims an open, unexpired matching request. A helper can accept one request at a time; the requester is notified. The requester and accepted helper can retrieve private details using `GET /api/v1/requests/:id`. The volunteer dashboard is at `/requests/matches`.
 
+The requester can cancel their own open or accepted request with `POST /api/v1/requests/:id/cancel`. Cancellation releases an assigned helper and notifies them. The accepted helper can mark their assignment fulfilled with `POST /api/v1/requests/:id/fulfill`, which restores availability and notifies the requester. Helpers can list active assignments at `GET /api/v1/requests/assisting`.
+
+Signed-in users can list their own paginated notifications at `GET /api/v1/notifications`, mark one unread notification using `POST /api/v1/notifications/:id/read`, and mark all unread notifications using `POST /api/v1/notifications/read-all`. The client inbox is at `/notifications`.
+
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.

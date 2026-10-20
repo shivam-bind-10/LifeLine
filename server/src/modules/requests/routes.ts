@@ -233,6 +233,36 @@ const listMyRequests: RequestHandler = async (request, response) => {
   response.status(200).json({ requests });
 };
 
+const listAssistingRequests: RequestHandler = async (request, response) => {
+  const userId = request.authUser?.id;
+  if (!userId) {
+    response.status(401).json({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'A valid access token is required.',
+      },
+    });
+    return;
+  }
+
+  const requests = await prisma.request.findMany({
+    where: { acceptedById: userId, status: 'ACCEPTED' },
+    orderBy: { neededBy: 'asc' },
+    take: 50,
+    select: {
+      id: true,
+      category: true,
+      urgency: true,
+      title: true,
+      neededBy: true,
+      status: true,
+      addressText: true,
+      requester: { select: { name: true, phone: true } },
+    },
+  });
+  response.status(200).json({ requests });
+};
+
 const updateHelperProfile: RequestHandler = async (request, response) => {
   const parsed = helperProfileSchema.safeParse(request.body);
   if (!parsed.success) {
@@ -252,6 +282,23 @@ const updateHelperProfile: RequestHandler = async (request, response) => {
       },
     });
     return;
+  }
+
+  if (parsed.data.isAvailable) {
+    const activeRequest = await prisma.request.findFirst({
+      where: { acceptedById: userId, status: 'ACCEPTED' },
+      select: { id: true },
+    });
+    if (activeRequest) {
+      response.status(409).json({
+        error: {
+          code: 'ACTIVE_REQUEST',
+          message:
+            'Complete or cancel your accepted request before becoming available again.',
+        },
+      });
+      return;
+    }
   }
 
   const profile = await prisma.helperProfile.upsert({
@@ -610,6 +657,171 @@ const getRequestDetails: RequestHandler = async (request, response) => {
   response.status(200).json({ request: details });
 };
 
+const cancelRequest: RequestHandler = async (request, response) => {
+  const userId = request.authUser?.id;
+  const parsedId = z.string().min(1).max(32).safeParse(request.params.id);
+  if (!userId) {
+    response.status(401).json({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'A valid access token is required.',
+      },
+    });
+    return;
+  }
+  if (!parsedId.success) {
+    validationError(response, 'The request id is invalid.');
+    return;
+  }
+
+  const current = await prisma.request.findUnique({
+    where: { id: parsedId.data },
+    select: {
+      requesterId: true,
+      acceptedById: true,
+      status: true,
+    },
+  });
+  if (!current || current.requesterId !== userId) {
+    response.status(404).json({
+      error: {
+        code: 'REQUEST_NOT_FOUND',
+        message: 'The request was not found.',
+      },
+    });
+    return;
+  }
+  if (current.status !== 'OPEN' && current.status !== 'ACCEPTED') {
+    response.status(409).json({
+      error: {
+        code: 'REQUEST_NOT_CANCELLABLE',
+        message: 'Only open or accepted requests can be cancelled.',
+      },
+    });
+    return;
+  }
+
+  const cancelled = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.request.updateMany({
+      where: {
+        id: parsedId.data,
+        requesterId: userId,
+        status: current.status,
+      },
+      data: { status: 'CANCELLED' },
+    });
+    if (result.count !== 1) {
+      return false;
+    }
+
+    if (current.acceptedById) {
+      await transaction.helperProfile.updateMany({
+        where: { userId: current.acceptedById },
+        data: { isAvailable: true },
+      });
+      await transaction.notification.create({
+        data: {
+          userId: current.acceptedById,
+          type: 'REQUEST_CANCELLED',
+          payload: { requestId: parsedId.data },
+        },
+      });
+    }
+    return true;
+  });
+
+  if (!cancelled) {
+    response.status(409).json({
+      error: {
+        code: 'REQUEST_STATUS_CHANGED',
+        message: 'The request changed before it could be cancelled.',
+      },
+    });
+    return;
+  }
+  response.status(200).json({ message: 'Request cancelled.' });
+};
+
+const fulfillRequest: RequestHandler = async (request, response) => {
+  const userId = request.authUser?.id;
+  const parsedId = z.string().min(1).max(32).safeParse(request.params.id);
+  if (!userId) {
+    response.status(401).json({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'A valid access token is required.',
+      },
+    });
+    return;
+  }
+  if (!parsedId.success) {
+    validationError(response, 'The request id is invalid.');
+    return;
+  }
+
+  const current = await prisma.request.findUnique({
+    where: { id: parsedId.data },
+    select: { requesterId: true, acceptedById: true, status: true },
+  });
+  if (!current || current.acceptedById !== userId) {
+    response.status(404).json({
+      error: {
+        code: 'REQUEST_NOT_FOUND',
+        message: 'The accepted request was not found.',
+      },
+    });
+    return;
+  }
+  if (current.status !== 'ACCEPTED') {
+    response.status(409).json({
+      error: {
+        code: 'REQUEST_NOT_FULFILLABLE',
+        message: 'Only an accepted request can be marked fulfilled.',
+      },
+    });
+    return;
+  }
+
+  const now = new Date();
+  const fulfilled = await prisma.$transaction(async (transaction) => {
+    const result = await transaction.request.updateMany({
+      where: {
+        id: parsedId.data,
+        acceptedById: userId,
+        status: 'ACCEPTED',
+      },
+      data: { status: 'FULFILLED', fulfilledAt: now },
+    });
+    if (result.count !== 1) {
+      return false;
+    }
+
+    await transaction.helperProfile.updateMany({
+      where: { userId },
+      data: { isAvailable: true },
+    });
+    await transaction.notification.create({
+      data: {
+        userId: current.requesterId,
+        type: 'REQUEST_FULFILLED',
+        payload: { requestId: parsedId.data },
+      },
+    });
+    return true;
+  });
+
+  if (!fulfilled) {
+    response.status(409).json({
+      error: {
+        code: 'REQUEST_STATUS_CHANGED',
+        message: 'The request changed before it could be completed.',
+      },
+    });
+    return;
+  }
+  response.status(200).json({ message: 'Request marked fulfilled.' });
+};
+
 export const requestRouter = Router();
 
 requestRouter.get('/', listOpenRequests);
@@ -638,10 +850,28 @@ requestRouter.post(
   createRequest,
 );
 requestRouter.get('/mine', authenticate, listMyRequests);
+requestRouter.get(
+  '/assisting',
+  authenticate,
+  requireRoles(Role.HELPER),
+  listAssistingRequests,
+);
 requestRouter.get('/:id', authenticate, getRequestDetails);
 requestRouter.post(
   '/:id/accept',
   authenticate,
   requireRoles(Role.HELPER),
   acceptRequest,
+);
+requestRouter.post(
+  '/:id/cancel',
+  authenticate,
+  requireRoles(Role.REQUESTER),
+  cancelRequest,
+);
+requestRouter.post(
+  '/:id/fulfill',
+  authenticate,
+  requireRoles(Role.HELPER),
+  fulfillRequest,
 );

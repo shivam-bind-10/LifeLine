@@ -30,6 +30,9 @@
 - Implemented helper availability profiles, location/radius/category matching, atomic request acceptance, requester notifications, and private detail access for the requester and accepted helper.
 - Added the volunteer dashboard at `/requests/matches`; helpers can configure their offerings and availability, browse nearby matches, accept a request, and see private contact details after acceptance.
 - Day 6 local validation: lint, all 36 API tests, and production client/server builds passed.
-- Next: add request completion/cancellation and notification inbox workflows.
+- Implemented requester cancellation, accepted-helper completion, availability restoration, and lifecycle notifications.
+- Added private active-assignment listing for helpers and an authenticated notification inbox with unread counts and individual/bulk read actions.
+- Day 7 local validation: lint, all 47 API tests, and production client/server builds passed.
+- Next: add direct messaging for accepted requests and reviews after fulfillment.
 - Known issue: Docker Compose and PostgreSQL are not installed locally; database migration and seed were validated in GitHub Actions instead.
 - Known issue: production password-reset email delivery is not configured; the API reports this explicitly until a provider is added.

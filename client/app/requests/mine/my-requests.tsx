@@ -47,6 +47,7 @@ export function MyRequests() {
   const { user, isLoading, apiFetch } = useAuth();
   const [requests, setRequests] = useState<OwnRequest[]>([]);
   const [isFetching, setIsFetching] = useState(false);
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -100,6 +101,44 @@ export function MyRequests() {
       });
     return () => controller.abort();
   }, [apiFetch, isLoading, user]);
+
+  async function cancelRequest(item: OwnRequest) {
+    setError(null);
+    setUpdatingId(item.id);
+    try {
+      const response = await apiFetch(
+        `${API_URL}/requests/${encodeURIComponent(item.id)}/cancel`,
+        { method: 'POST' },
+      );
+      const body: unknown = await response.json();
+      if (!response.ok) {
+        const message =
+          typeof body === 'object' &&
+          body !== null &&
+          'error' in body &&
+          typeof body.error === 'object' &&
+          body.error !== null &&
+          'message' in body.error &&
+          typeof body.error.message === 'string'
+            ? body.error.message
+            : `Could not cancel request (HTTP ${response.status}).`;
+        throw new Error(message);
+      }
+      setRequests((current) =>
+        current.map((entry) =>
+          entry.id === item.id ? { ...entry, status: 'CANCELLED' } : entry,
+        ),
+      );
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : 'Unable to cancel this request.',
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
 
   if (isLoading || (user && isFetching)) {
     return (
@@ -182,6 +221,16 @@ export function MyRequests() {
                 <p className="mt-2 text-sm text-muted">
                   Responder address: {item.addressText}
                 </p>
+              )}
+              {(item.status === 'OPEN' || item.status === 'ACCEPTED') && (
+                <button
+                  className="mt-4 rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-surface disabled:opacity-60"
+                  disabled={updatingId !== null}
+                  onClick={() => void cancelRequest(item)}
+                  type="button"
+                >
+                  {updatingId === item.id ? 'Cancelling...' : 'Cancel request'}
+                </button>
               )}
             </li>
           ))}

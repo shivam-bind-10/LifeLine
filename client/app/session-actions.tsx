@@ -55,6 +55,12 @@ export function SessionActions() {
       )}
       <Link
         className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
+        href="/notifications"
+      >
+        Notifications
+      </Link>
+      <Link
+        className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
         href="/requests/mine"
       >
         My requests
