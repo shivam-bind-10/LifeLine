@@ -8,10 +8,14 @@ type Mode = 'login' | 'register' | 'forgot';
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
 
-export function AuthForm() {
+export function AuthForm({
+  initialMode = 'login',
+}: {
+  initialMode?: 'login' | 'register';
+}) {
   const { user, isLoading, sessionError, signIn, register, signOut } =
     useAuth();
-  const [mode, setMode] = useState<Mode>('login');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,7 +89,7 @@ export function AuthForm() {
 
   return (
     <main className="flex min-h-screen items-center justify-center px-5 py-12">
-      <section className="w-full max-w-md rounded-2xl border border-border bg-background p-7 shadow-sm sm:p-9">
+      <section className="w-full max-w-md rounded-[1.75rem] border border-border bg-white p-7 shadow-[0_24px_80px_-48px_rgba(21,41,35,0.45)] sm:p-9">
         <Link
           className="text-sm font-semibold uppercase tracking-[0.2em] text-brand-700"
           href="/"

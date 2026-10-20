@@ -39,5 +39,7 @@
 - Added post-fulfillment reviews: each requester/helper can review the other once, with ratings and optional comments; reviewers are surfaced in both request history and the volunteer dashboard.
 - Added review uniqueness, rating-range, and participant foreign-key constraints in a database migration. Review access and submission require fulfilled requests and verified participants.
 - Review checkpoint validation: lint, all 62 API tests, Prisma schema validation, and production client/server builds passed.
+- Refreshed the public experience with a responsive, professional landing page, consistent navigation, accessible interaction styles, and a simplified local setup README.
+- Corrected the Geist font variable wiring so the intended sans-serif typeface renders across the app.
 - Known issue: Docker Compose and PostgreSQL are not installed locally; database migration and seed were validated in GitHub Actions instead.
 - Known issue: production password-reset email delivery is not configured; the API reports this explicitly until a provider is added.

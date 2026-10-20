@@ -29,15 +29,24 @@ export function SessionActions() {
     return (
       <div className="flex items-center gap-3">
         {error && (
-          <span className="text-xs text-warning-foreground" role="alert">
+          <span
+            className="hidden text-xs text-warning-foreground sm:inline"
+            role="alert"
+          >
             {error}
           </span>
         )}
         <Link
-          className="rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-surface"
+          className="hidden rounded-xl px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-surface sm:inline-flex"
           href="/auth"
         >
           Sign in
+        </Link>
+        <Link
+          className="rounded-xl bg-forest-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-forest-700"
+          href="/auth?mode=register"
+        >
+          Join LifeLine
         </Link>
       </div>
     );
@@ -45,38 +54,33 @@ export function SessionActions() {
 
   return (
     <div className="flex items-center gap-3">
-      {user.role === 'HELPER' && (
-        <Link
-          className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
-          href="/requests/matches"
-        >
-          Volunteer matches
-        </Link>
-      )}
       <Link
-        className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
+        className="hidden text-sm font-semibold text-muted hover:text-forest-900 sm:inline"
         href="/notifications"
       >
         Notifications
       </Link>
       <Link
-        className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
-        href="/requests/mine"
+        className="hidden text-sm font-semibold text-muted hover:text-forest-900 sm:inline"
+        href={user.role === 'HELPER' ? '/requests/matches' : '/requests/mine'}
       >
-        My requests
+        {user.role === 'HELPER' ? 'Volunteer dashboard' : 'My requests'}
       </Link>
-      <span className="hidden text-sm text-muted sm:inline">
+      <span className="hidden text-sm text-muted lg:inline">
         Hi, {user.name}
       </span>
       <button
-        className="rounded-md border border-border px-4 py-2 text-sm font-semibold hover:bg-surface"
+        className="rounded-xl border border-border bg-background px-3.5 py-2.5 text-sm font-semibold hover:bg-surface"
         onClick={() => void handleSignOut()}
         type="button"
       >
         Sign out
       </button>
       {error && (
-        <span className="text-xs text-warning-foreground" role="alert">
+        <span
+          className="hidden text-xs text-warning-foreground sm:inline"
+          role="alert"
+        >
           {error}
         </span>
       )}
