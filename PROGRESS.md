@@ -24,6 +24,9 @@
 - Day 3 local validation: lint, 20 tests, both TypeScript builds, Prisma validation, and dependency audit passed.
 - Completed the app shell and sign-in/requester/helper registration UI. The client restores sessions through the refresh-cookie endpoint and keeps access tokens in memory rather than browser storage.
 - Day 4 local validation: lint, all 20 API tests, and production client/server builds passed. The client UI was also checked in a local production preview.
-- Next: implement emergency request creation and browsing against the existing Prisma schema.
+- Implemented emergency request browsing, cursor pagination, category/urgency filters, requester-only request creation, and owner-only request history using the existing schema.
+- Added public coordinate rounding so open requests don't disclose exact locations, and kept request details/addresses behind the owner-only endpoint.
+- Day 5 local validation: lint, all 28 API tests, and production client/server builds passed.
+- Next: add request response/acceptance workflows and volunteer availability matching.
 - Known issue: Docker Compose and PostgreSQL are not installed locally; database migration and seed were validated in GitHub Actions instead.
 - Known issue: production password-reset email delivery is not configured; the API reports this explicitly until a provider is added.

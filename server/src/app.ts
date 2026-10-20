@@ -2,6 +2,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import express from 'express';
 import { authRouter } from './modules/auth/routes.js';
+import { requestRouter } from './modules/requests/routes.js';
 import { errorHandler } from './middleware/error.js';
 
 export function createApp() {
@@ -17,6 +18,7 @@ export function createApp() {
   });
 
   app.use('/api/v1', authRouter);
+  app.use('/api/v1/requests', requestRouter);
   app.use(errorHandler);
 
   return app;

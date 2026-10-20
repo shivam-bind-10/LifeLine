@@ -29,9 +29,15 @@ export default function Home() {
         <div className="mt-8 flex flex-wrap gap-4">
           <Link
             className="rounded-md bg-brand-700 px-5 py-3 font-semibold text-white hover:bg-brand-800"
-            href="/auth"
+            href="/requests/new"
           >
             Request Help
+          </Link>
+          <Link
+            className="rounded-md border border-border px-5 py-3 font-semibold text-foreground hover:bg-surface"
+            href="/requests"
+          >
+            Browse Requests
           </Link>
           <Link
             className="rounded-md border border-border px-5 py-3 font-semibold text-foreground hover:bg-surface"

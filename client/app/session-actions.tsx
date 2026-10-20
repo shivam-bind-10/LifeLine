@@ -45,6 +45,12 @@ export function SessionActions() {
 
   return (
     <div className="flex items-center gap-3">
+      <Link
+        className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
+        href="/requests/mine"
+      >
+        My requests
+      </Link>
       <span className="hidden text-sm text-muted sm:inline">
         Hi, {user.name}
       </span>

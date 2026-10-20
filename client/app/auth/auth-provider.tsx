@@ -36,6 +36,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   isLoading: boolean;
   sessionError: string | null;
+  apiFetch: (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
   signIn: (credentials: Credentials) => Promise<void>;
   register: (details: Registration) => Promise<void>;
   signOut: () => Promise<void>;
@@ -116,6 +117,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const accessToken = useRef<string | null>(null);
   const bootstrapStarted = useRef(false);
+
+  const refreshAccessToken = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error(
+          await errorMessage(response, 'Your session has expired'),
+        );
+      }
+      const body: unknown = await response.json();
+      accessToken.current = accessTokenFromBody(body);
+      return accessToken.current;
+    } catch (refreshError) {
+      accessToken.current = null;
+      setUser(null);
+      throw refreshError;
+    }
+  }, []);
+
+  const apiFetch = useCallback(
+    async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      let token = accessToken.current ?? (await refreshAccessToken());
+      const send = (accessToken: string) => {
+        const headers = new Headers(init.headers);
+        headers.set('Authorization', `Bearer ${accessToken}`);
+        return fetch(input, { ...init, headers });
+      };
+
+      let response = await send(token);
+      if (response.status === 401) {
+        token = await refreshAccessToken();
+        response = await send(token);
+      }
+      return response;
+    },
+    [refreshAccessToken],
+  );
 
   const createSession = useCallback(
     async (path: 'login' | 'register', details: Credentials | Registration) => {
@@ -210,7 +251,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, isLoading, sessionError, signIn, register, signOut }}
+      value={{
+        user,
+        isLoading,
+        sessionError,
+        apiFetch,
+        signIn,
+        register,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

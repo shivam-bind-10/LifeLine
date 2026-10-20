@@ -26,6 +26,12 @@ Passwords are hashed with bcrypt at cost 12. Access tokens expire after 15 minut
 
 The client provides sign-in and requester/helper registration at `/auth`. It keeps access tokens in memory and restores sessions with the httpOnly refresh cookie.
 
+## Emergency requests
+
+`GET /api/v1/requests` lists open requests and accepts optional `category`, `urgency`, `limit` (1-50), and `cursor` filters. Public results contain a short summary and coordinates rounded to two decimal places; addresses and request details are not exposed. `POST /api/v1/requests` requires an authenticated requester account and validates category, urgency, location, and future needed-by time. Blood requests also require a blood group and unit count. `GET /api/v1/requests/mine` requires authentication and returns only the signed-in user's requests, including their private address/details.
+
+The client provides a public request feed at `/requests`, a requester form at `/requests/new`, and an owner-only request list at `/requests/mine`. Device location is read only after the user explicitly chooses the location button.
+
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.
