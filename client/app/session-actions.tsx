@@ -45,6 +45,14 @@ export function SessionActions() {
 
   return (
     <div className="flex items-center gap-3">
+      {user.role === 'HELPER' && (
+        <Link
+          className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
+          href="/requests/matches"
+        >
+          Volunteer matches
+        </Link>
+      )}
       <Link
         className="hidden text-sm font-semibold hover:text-brand-700 sm:inline"
         href="/requests/mine"

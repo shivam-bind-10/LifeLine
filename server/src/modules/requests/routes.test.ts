@@ -12,15 +12,31 @@ const database = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   requestFindMany: vi.fn(),
   requestCreate: vi.fn(),
+  requestFindUnique: vi.fn(),
+  requestUpdateMany: vi.fn(),
+  helperProfileFindUnique: vi.fn(),
+  helperProfileUpsert: vi.fn(),
+  helperProfileUpdateMany: vi.fn(),
+  notificationCreate: vi.fn(),
+  transaction: vi.fn(),
 }));
 
 vi.mock('../../lib/prisma.js', () => ({
   prisma: {
     user: { findUnique: database.userFindUnique },
+    helperProfile: {
+      findUnique: database.helperProfileFindUnique,
+      upsert: database.helperProfileUpsert,
+      updateMany: database.helperProfileUpdateMany,
+    },
     request: {
       findMany: database.requestFindMany,
       create: database.requestCreate,
+      findUnique: database.requestFindUnique,
+      updateMany: database.requestUpdateMany,
     },
+    notification: { create: database.notificationCreate },
+    $transaction: database.transaction,
   },
 }));
 
@@ -41,6 +57,13 @@ describe('request routes', () => {
       role: Role.REQUESTER,
       isBlocked: false,
     });
+    database.transaction.mockImplementation(async (operation) =>
+      operation({
+        helperProfile: { updateMany: database.helperProfileUpdateMany },
+        request: { updateMany: database.requestUpdateMany },
+        notification: { create: database.notificationCreate },
+      }),
+    );
   });
 
   it('lists only open requests and rounds public coordinates', async () => {
@@ -228,5 +251,311 @@ describe('request routes', () => {
         where: { requesterId: 'user-1' },
       }),
     );
+  });
+
+  it('saves a volunteer matching profile', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'user-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.helperProfileUpsert.mockResolvedValue({
+      offerings: ['BLOOD', 'OXYGEN'],
+      bloodGroup: 'O_POSITIVE',
+      lat: 12.97,
+      lng: 77.59,
+      radiusKm: 20,
+      isAvailable: true,
+      availableFrom: null,
+      availableTo: null,
+    });
+
+    const response = await request(createApp())
+      .put('/api/v1/requests/helper-profile')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`)
+      .send({
+        offerings: ['BLOOD', 'OXYGEN'],
+        bloodGroup: 'O_POSITIVE',
+        lat: 12.97,
+        lng: 77.59,
+        radiusKm: 20,
+        isAvailable: true,
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.profile.radiusKm).toBe(20);
+    expect(database.helperProfileUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: 'user-1' },
+        create: expect.objectContaining({
+          userId: 'user-1',
+          offerings: ['BLOOD', 'OXYGEN'],
+        }),
+      }),
+    );
+  });
+
+  it('rejects invalid helper profile coordinates', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'user-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    const response = await request(createApp())
+      .put('/api/v1/requests/helper-profile')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`)
+      .send({
+        offerings: ['BLOOD'],
+        lat: 200,
+        lng: 77.59,
+        radiusKm: 10,
+        isAvailable: true,
+      });
+
+    expect(response.status).toBe(400);
+    expect(database.helperProfileUpsert).not.toHaveBeenCalled();
+  });
+
+  it('returns open requests within a volunteer profile radius', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'user-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.helperProfileFindUnique.mockResolvedValue({
+      offerings: ['OXYGEN'],
+      bloodGroup: null,
+      lat: 12.97,
+      lng: 77.59,
+      radiusKm: 10,
+      isAvailable: true,
+    });
+    database.requestFindMany.mockResolvedValue([
+      {
+        id: 'nearby',
+        category: 'OXYGEN',
+        urgency: 'HIGH',
+        title: 'Oxygen support',
+        bloodGroup: null,
+        lat: 12.98,
+        lng: 77.6,
+        neededBy,
+        createdAt,
+      },
+      {
+        id: 'far-away',
+        category: 'OXYGEN',
+        urgency: 'NORMAL',
+        title: 'Oxygen cylinder',
+        bloodGroup: null,
+        lat: 13.5,
+        lng: 78.1,
+        neededBy,
+        createdAt,
+      },
+    ]);
+
+    const response = await request(createApp())
+      .get('/api/v1/requests/matches')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.requests).toHaveLength(1);
+    expect(response.body.requests[0].id).toBe('nearby');
+    expect(response.body.requests[0].distanceKm).toBeGreaterThan(0);
+    expect(database.requestFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          category: { in: ['OXYGEN'] },
+          requesterId: { not: 'user-1' },
+        }),
+      }),
+    );
+  });
+
+  it('accepts a matching request once and notifies the requester', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'helper-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.helperProfileFindUnique.mockResolvedValue({
+      offerings: ['OXYGEN'],
+      bloodGroup: null,
+      lat: 12.97,
+      lng: 77.59,
+      radiusKm: 10,
+      isAvailable: true,
+    });
+    database.requestFindUnique.mockResolvedValue({
+      id: 'request-4',
+      requesterId: 'requester-1',
+      category: 'OXYGEN',
+      bloodGroup: null,
+      lat: 12.98,
+      lng: 77.6,
+    });
+    database.helperProfileUpdateMany.mockResolvedValue({ count: 1 });
+    database.requestUpdateMany.mockResolvedValue({ count: 1 });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-4/accept')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`);
+
+    expect(response.status).toBe(200);
+    expect(database.helperProfileUpdateMany).toHaveBeenCalledWith({
+      where: { userId: 'helper-1', isAvailable: true },
+      data: { isAvailable: false },
+    });
+    expect(database.requestUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'request-4',
+          status: 'OPEN',
+        }),
+        data: { status: 'ACCEPTED', acceptedById: 'helper-1' },
+      }),
+    );
+    expect(database.notificationCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 'requester-1',
+          type: 'REQUEST_ACCEPTED',
+        }),
+      }),
+    );
+  });
+
+  it('restores helper availability when a request was claimed by another volunteer', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'helper-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.helperProfileFindUnique.mockResolvedValue({
+      offerings: ['OXYGEN'],
+      bloodGroup: null,
+      lat: 12.97,
+      lng: 77.59,
+      radiusKm: 10,
+      isAvailable: true,
+    });
+    database.requestFindUnique.mockResolvedValue({
+      id: 'request-4',
+      requesterId: 'requester-1',
+      category: 'OXYGEN',
+      bloodGroup: null,
+      lat: 12.98,
+      lng: 77.6,
+    });
+    database.helperProfileUpdateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    database.requestUpdateMany.mockResolvedValue({ count: 0 });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-4/accept')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`);
+
+    expect(response.status).toBe(409);
+    expect(database.helperProfileUpdateMany).toHaveBeenCalledTimes(2);
+    expect(database.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not claim another request when a helper has already accepted one', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'helper-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.helperProfileFindUnique.mockResolvedValue({
+      offerings: ['OXYGEN'],
+      bloodGroup: null,
+      lat: 12.97,
+      lng: 77.59,
+      radiusKm: 10,
+      isAvailable: true,
+    });
+    database.requestFindUnique.mockResolvedValue({
+      id: 'request-6',
+      requesterId: 'requester-1',
+      category: 'OXYGEN',
+      bloodGroup: null,
+      lat: 12.98,
+      lng: 77.6,
+    });
+    database.helperProfileUpdateMany.mockResolvedValue({ count: 0 });
+
+    const response = await request(createApp())
+      .post('/api/v1/requests/request-6/accept')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`);
+
+    expect(response.status).toBe(409);
+    expect(database.requestUpdateMany).not.toHaveBeenCalled();
+    expect(database.notificationCreate).not.toHaveBeenCalled();
+  });
+
+  it('shows private details only to the requester or accepted volunteer', async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'helper-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.requestFindUnique.mockResolvedValue({
+      id: 'request-5',
+      requesterId: 'requester-1',
+      acceptedById: 'helper-1',
+      category: 'OXYGEN',
+      urgency: 'HIGH',
+      title: 'Oxygen support',
+      details: { description: 'Please call on arrival.' },
+      bloodGroup: null,
+      units: null,
+      lat: 12.97,
+      lng: 77.59,
+      addressText: 'Private address',
+      neededBy,
+      status: 'ACCEPTED',
+      createdAt,
+      requester: { name: 'Requester', phone: '123456789' },
+    });
+
+    const response = await request(createApp())
+      .get('/api/v1/requests/request-5')
+      .set('Authorization', `Bearer ${accessToken(Role.HELPER)}`);
+
+    expect(response.status).toBe(200);
+    expect(response.body.request.addressText).toBe('Private address');
+    expect(response.body.request.requester.phone).toBe('123456789');
+    expect(response.body.request).not.toHaveProperty('requesterId');
+    expect(response.body.request).not.toHaveProperty('acceptedById');
+  });
+
+  it('hides private request details from unrelated authenticated users', async () => {
+    database.requestFindUnique.mockResolvedValue({
+      id: 'request-7',
+      requesterId: 'another-user',
+      acceptedById: null,
+      category: 'OXYGEN',
+      urgency: 'HIGH',
+      title: 'Oxygen support',
+      details: { description: 'Private' },
+      bloodGroup: null,
+      units: null,
+      lat: 12.97,
+      lng: 77.59,
+      addressText: 'Private address',
+      neededBy,
+      status: 'OPEN',
+      createdAt,
+      requester: { name: 'Requester', phone: '123456789' },
+    });
+
+    const response = await request(createApp())
+      .get('/api/v1/requests/request-7')
+      .set('Authorization', `Bearer ${accessToken()}`);
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe('REQUEST_NOT_FOUND');
   });
 });

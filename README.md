@@ -32,6 +32,12 @@ The client provides sign-in and requester/helper registration at `/auth`. It kee
 
 The client provides a public request feed at `/requests`, a requester form at `/requests/new`, and an owner-only request list at `/requests/mine`. Device location is read only after the user explicitly chooses the location button.
 
+## Volunteer matching and acceptance
+
+Helpers can save their offerings, optional blood group, location, travel radius, and availability through `PUT /api/v1/requests/helper-profile`. `GET /api/v1/requests/helper-profile` reads only the signed-in helper's profile. `GET /api/v1/requests/matches` returns open requests within the helper's radius and category offerings; blood requests are matched only to the same listed blood group. Matching results expose approximate locations.
+
+`POST /api/v1/requests/:id/accept` atomically reserves an available helper and claims an open, unexpired matching request. A helper can accept one request at a time; the requester is notified. The requester and accepted helper can retrieve private details using `GET /api/v1/requests/:id`. The volunteer dashboard is at `/requests/matches`.
+
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.

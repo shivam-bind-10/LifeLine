@@ -27,6 +27,9 @@
 - Implemented emergency request browsing, cursor pagination, category/urgency filters, requester-only request creation, and owner-only request history using the existing schema.
 - Added public coordinate rounding so open requests don't disclose exact locations, and kept request details/addresses behind the owner-only endpoint.
 - Day 5 local validation: lint, all 28 API tests, and production client/server builds passed.
-- Next: add request response/acceptance workflows and volunteer availability matching.
+- Implemented helper availability profiles, location/radius/category matching, atomic request acceptance, requester notifications, and private detail access for the requester and accepted helper.
+- Added the volunteer dashboard at `/requests/matches`; helpers can configure their offerings and availability, browse nearby matches, accept a request, and see private contact details after acceptance.
+- Day 6 local validation: lint, all 36 API tests, and production client/server builds passed.
+- Next: add request completion/cancellation and notification inbox workflows.
 - Known issue: Docker Compose and PostgreSQL are not installed locally; database migration and seed were validated in GitHub Actions instead.
 - Known issue: production password-reset email delivery is not configured; the API reports this explicitly until a provider is added.
