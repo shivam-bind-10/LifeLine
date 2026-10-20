@@ -33,9 +33,11 @@
 - Implemented requester cancellation, accepted-helper completion, availability restoration, and lifecycle notifications.
 - Added private active-assignment listing for helpers and an authenticated notification inbox with unread counts and individual/bulk read actions.
 - Day 7 local validation: lint, all 47 API tests, and production client/server builds passed.
-- Next: add direct messaging for accepted requests and reviews after fulfillment.
 - Implemented private request conversations for the requester and accepted helper, message notifications, and links from request history, the helper dashboard, and the notification inbox.
 - Added a database migration tying each message to its sender. Message history is limited to the two participants; posting is allowed only while a request is accepted.
 - Messaging checkpoint validation: lint, all 54 API tests, Prisma schema validation, and production client/server builds passed.
+- Added post-fulfillment reviews: each requester/helper can review the other once, with ratings and optional comments; reviewers are surfaced in both request history and the volunteer dashboard.
+- Added review uniqueness, rating-range, and participant foreign-key constraints in a database migration. Review access and submission require fulfilled requests and verified participants.
+- Review checkpoint validation: lint, all 62 API tests, Prisma schema validation, and production client/server builds passed.
 - Known issue: Docker Compose and PostgreSQL are not installed locally; database migration and seed were validated in GitHub Actions instead.
 - Known issue: production password-reset email delivery is not configured; the API reports this explicitly until a provider is added.

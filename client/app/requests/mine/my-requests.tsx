@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../auth/auth-provider';
+import { ReviewForm, type ReviewSummary } from '../review-form';
 
 type OwnRequest = {
   id: string;
@@ -13,7 +14,27 @@ type OwnRequest = {
   neededBy: string;
   status: string;
   createdAt: string;
+  reviews: ReviewSummary[];
 };
+
+function isReviewSummary(value: unknown): value is ReviewSummary {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    typeof value.id === 'string' &&
+    'rating' in value &&
+    typeof value.rating === 'number' &&
+    Number.isInteger(value.rating) &&
+    value.rating >= 1 &&
+    value.rating <= 5 &&
+    'comment' in value &&
+    (typeof value.comment === 'string' || value.comment === null) &&
+    'createdAt' in value &&
+    typeof value.createdAt === 'string' &&
+    Number.isFinite(Date.parse(value.createdAt))
+  );
+}
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
@@ -39,7 +60,10 @@ function isOwnRequest(value: unknown): value is OwnRequest {
     typeof value.status === 'string' &&
     'createdAt' in value &&
     typeof value.createdAt === 'string' &&
-    Number.isFinite(Date.parse(value.createdAt))
+    Number.isFinite(Date.parse(value.createdAt)) &&
+    'reviews' in value &&
+    Array.isArray(value.reviews) &&
+    value.reviews.every(isReviewSummary)
   );
 }
 
@@ -239,6 +263,13 @@ export function MyRequests() {
                 >
                   {updatingId === item.id ? 'Cancelling...' : 'Cancel request'}
                 </button>
+              )}
+              {item.status === 'FULFILLED' && (
+                <ReviewForm
+                  requestId={item.id}
+                  revieweeName="your volunteer"
+                  initialReview={item.reviews[0] ?? null}
+                />
               )}
             </li>
           ))}

@@ -5,6 +5,7 @@ import { authRouter } from './modules/auth/routes.js';
 import { requestRouter } from './modules/requests/routes.js';
 import { notificationRouter } from './modules/notifications/routes.js';
 import { conversationRouter } from './modules/conversations/routes.js';
+import { reviewRouter } from './modules/reviews/routes.js';
 import { errorHandler } from './middleware/error.js';
 
 export function createApp() {
@@ -22,6 +23,7 @@ export function createApp() {
   app.use('/api/v1', authRouter);
   app.use('/api/v1/requests', requestRouter);
   app.use('/api/v1/requests', conversationRouter);
+  app.use('/api/v1/requests', reviewRouter);
   app.use('/api/v1/notifications', notificationRouter);
   app.use(errorHandler);
 

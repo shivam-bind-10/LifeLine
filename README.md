@@ -46,6 +46,10 @@ Signed-in users can list their own paginated notifications at `GET /api/v1/notif
 
 The requester and accepted helper can list the latest 100 messages using `GET /api/v1/requests/:id/messages` and send a message using `POST /api/v1/requests/:id/messages` with a trimmed `text` value of 1-2000 characters. New messages notify the other participant. Conversation history remains available after fulfillment, but new messages are accepted only while the request is active. The client conversation is linked from both the requester's history and the helper dashboard.
 
+## Post-fulfillment reviews
+
+After a request is fulfilled, its requester and accepted helper can read the request's reviews using `GET /api/v1/requests/:id/reviews` and each submit one review using `POST /api/v1/requests/:id/reviews` with a `rating` from 1-5 and an optional `comment` up to 1000 characters. Each participant reviews the other; request ownership, fulfillment status, and duplicate submissions are enforced by the API and database. Requesters can review from their request history, and helpers can review from the fulfilled requests on their volunteer dashboard.
+
 ## Validation
 
 Run `npm run lint`, `npm test`, and `npm run build` from the repository root.

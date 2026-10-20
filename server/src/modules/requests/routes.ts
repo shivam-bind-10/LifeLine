@@ -228,6 +228,10 @@ const listMyRequests: RequestHandler = async (request, response) => {
       neededBy: true,
       status: true,
       createdAt: true,
+      reviews: {
+        where: { reviewerId: userId },
+        select: { id: true, rating: true, comment: true, createdAt: true },
+      },
     },
   });
   response.status(200).json({ requests });
@@ -258,6 +262,38 @@ const listAssistingRequests: RequestHandler = async (request, response) => {
       status: true,
       addressText: true,
       requester: { select: { name: true, phone: true } },
+    },
+  });
+  response.status(200).json({ requests });
+};
+
+const listCompletedRequests: RequestHandler = async (request, response) => {
+  const userId = request.authUser?.id;
+  if (!userId) {
+    response.status(401).json({
+      error: {
+        code: 'UNAUTHORIZED',
+        message: 'A valid access token is required.',
+      },
+    });
+    return;
+  }
+
+  const requests = await prisma.request.findMany({
+    where: { acceptedById: userId, status: 'FULFILLED' },
+    orderBy: { fulfilledAt: 'desc' },
+    take: 50,
+    select: {
+      id: true,
+      category: true,
+      urgency: true,
+      title: true,
+      fulfilledAt: true,
+      requester: { select: { name: true } },
+      reviews: {
+        where: { reviewerId: userId },
+        select: { id: true, rating: true, comment: true, createdAt: true },
+      },
     },
   });
   response.status(200).json({ requests });
@@ -855,6 +891,12 @@ requestRouter.get(
   authenticate,
   requireRoles(Role.HELPER),
   listAssistingRequests,
+);
+requestRouter.get(
+  '/completed',
+  authenticate,
+  requireRoles(Role.HELPER),
+  listCompletedRequests,
 );
 requestRouter.get('/:id', authenticate, getRequestDetails);
 requestRouter.post(

@@ -557,6 +557,51 @@ describe('request routes', () => {
     expect(response.body.request).not.toHaveProperty('acceptedById');
   });
 
+  it("lists a helper's fulfilled requests and only their own review state", async () => {
+    database.userFindUnique.mockResolvedValue({
+      id: 'helper-1',
+      role: Role.HELPER,
+      isBlocked: false,
+    });
+    database.requestFindMany.mockResolvedValue([
+      {
+        id: 'request-fulfilled',
+        title: 'Oxygen support',
+        category: 'OXYGEN',
+        urgency: 'HIGH',
+        fulfilledAt: createdAt,
+        requester: { name: 'Requester' },
+        reviews: [],
+      },
+    ]);
+
+    const response = await request(createApp())
+      .get('/api/v1/requests/completed')
+      .set(
+        'Authorization',
+        `Bearer ${createAccessToken({ id: 'helper-1', role: Role.HELPER })}`,
+      );
+
+    expect(response.status).toBe(200);
+    expect(response.body.requests[0].requester.name).toBe('Requester');
+    expect(database.requestFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { acceptedById: 'helper-1', status: 'FULFILLED' },
+        select: expect.objectContaining({
+          reviews: {
+            where: { reviewerId: 'helper-1' },
+            select: {
+              id: true,
+              rating: true,
+              comment: true,
+              createdAt: true,
+            },
+          },
+        }),
+      }),
+    );
+  });
+
   it('hides private request details from unrelated authenticated users', async () => {
     database.requestFindUnique.mockResolvedValue({
       id: 'request-7',

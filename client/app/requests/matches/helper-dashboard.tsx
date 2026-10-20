@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '../../auth/auth-provider';
+import { ReviewForm, type ReviewSummary } from '../review-form';
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api/v1';
@@ -46,6 +47,16 @@ type AcceptedRequest = {
   neededBy: string;
   addressText: string | null;
   requester: { name: string; phone: string | null };
+};
+
+type CompletedRequest = {
+  id: string;
+  title: string;
+  category: string;
+  urgency: string;
+  fulfilledAt: string;
+  requester: { name: string };
+  reviews: ReviewSummary[];
 };
 
 function isHelperProfile(value: unknown): value is HelperProfile {
@@ -100,6 +111,36 @@ function isAcceptedRequest(value: unknown): value is AcceptedRequest {
   );
 }
 
+function isReviewSummary(value: unknown): value is ReviewSummary {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.rating === 'number' &&
+    Number.isInteger(value.rating) &&
+    value.rating >= 1 &&
+    value.rating <= 5 &&
+    (typeof value.comment === 'string' || value.comment === null) &&
+    typeof value.createdAt === 'string' &&
+    Number.isFinite(Date.parse(value.createdAt))
+  );
+}
+
+function isCompletedRequest(value: unknown): value is CompletedRequest {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.category === 'string' &&
+    typeof value.urgency === 'string' &&
+    typeof value.fulfilledAt === 'string' &&
+    Number.isFinite(Date.parse(value.fulfilledAt)) &&
+    isRecord(value.requester) &&
+    typeof value.requester.name === 'string' &&
+    Array.isArray(value.reviews) &&
+    value.reviews.every(isReviewSummary)
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -121,6 +162,7 @@ export function HelperDashboard() {
   const [offerings, setOfferings] = useState<string[]>([]);
   const [matches, setMatches] = useState<MatchedRequest[]>([]);
   const [assisting, setAssisting] = useState<AcceptedRequest[]>([]);
+  const [completed, setCompleted] = useState<CompletedRequest[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
@@ -156,6 +198,8 @@ export function HelperDashboard() {
         setProfile(null);
         setOfferings([]);
         setMatches([]);
+        setAssisting([]);
+        setCompleted([]);
         setIsAvailable(false);
         return;
       }
@@ -177,6 +221,24 @@ export function HelperDashboard() {
         );
       }
       setAssisting(assistingBody.requests);
+
+      const completedResponse = await apiFetch(`${API_URL}/requests/completed`);
+      const completedBody: unknown = await completedResponse.json();
+      if (!completedResponse.ok) {
+        throw new Error(
+          getErrorMessage(completedBody, completedResponse.status),
+        );
+      }
+      if (
+        !isRecord(completedBody) ||
+        !Array.isArray(completedBody.requests) ||
+        !completedBody.requests.every(isCompletedRequest)
+      ) {
+        throw new Error(
+          'The server returned an invalid completed request list.',
+        );
+      }
+      setCompleted(completedBody.requests);
 
       const matchesResponse = await apiFetch(`${API_URL}/requests/matches`);
       const matchesBody: unknown = await matchesResponse.json();
@@ -624,6 +686,39 @@ export function HelperDashboard() {
                   >
                     {acceptingId === item.id ? 'Updating...' : 'Mark fulfilled'}
                   </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {completed.length > 0 && (
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold">Recently fulfilled</h3>
+            <ul className="mt-4 space-y-3">
+              {completed.map((item) => (
+                <li
+                  className="rounded-xl border border-border bg-surface p-5"
+                  key={item.id}
+                >
+                  <h4 className="font-semibold">{item.title}</h4>
+                  <p className="mt-2 text-sm text-muted">
+                    Fulfilled{' '}
+                    {new Intl.DateTimeFormat(undefined, {
+                      dateStyle: 'medium',
+                    }).format(new Date(item.fulfilledAt))}
+                  </p>
+                  <Link
+                    className="mt-3 inline-block text-sm font-semibold text-brand-700 hover:text-brand-800"
+                    href={`/requests/${encodeURIComponent(item.id)}/messages`}
+                  >
+                    View conversation
+                  </Link>
+                  <ReviewForm
+                    requestId={item.id}
+                    revieweeName={item.requester.name}
+                    initialReview={item.reviews[0] ?? null}
+                  />
                 </li>
               ))}
             </ul>
